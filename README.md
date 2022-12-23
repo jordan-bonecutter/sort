@@ -1,3 +1,5 @@
+[![Go Reference](https://pkg.go.dev/badge/github.com/jordan-bonecutter/sort.svg)](https://pkg.go.dev/github.com/jordan-bonecutter/sort)
+
 # sort
 A faster implementation of Go's sort package for slices.
 
