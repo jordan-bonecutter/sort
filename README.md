@@ -1,3 +1,4 @@
+![Test](https://github.com/jordan-bonecutter/sort/workflows/Main/badge.svg)
 [![Go Reference](https://pkg.go.dev/badge/github.com/jordan-bonecutter/sort.svg)](https://pkg.go.dev/github.com/jordan-bonecutter/sort)
 
 # sort
