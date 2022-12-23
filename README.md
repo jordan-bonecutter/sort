@@ -1,5 +1,5 @@
 # sort
-A faster implementation of Go's sort for Ordered types.
+A faster implementation of Go's sort package.
 
 # How
 Go now has generics, but the sort implementation uses a `lessSwap` wrapper struct with the following form:
