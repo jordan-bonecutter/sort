@@ -31,11 +31,19 @@ func TestSortCapability(t *testing.T) {
 func TestSortSpeed(t *testing.T) {
   avgFastSorterDur := getAvgSpeed[int](fastsort.Ordered[int], rand.Int)
   t.Logf("Fast implementation took %v", avgFastSorterDur)
+  avgFastLessSorterDur := getAvgSpeed[int](func(data []int) {
+    fastsort.LessSort[int](data, func(a, b *int) bool { return *a < *b })
+  }, rand.Int)
+  t.Logf("Fast LessSort implementation took %v", avgFastLessSorterDur)
   avgDefaultSorterDur := getAvgSpeed[int](sort.Ints, rand.Int)
   t.Logf("Default implementation took %v", avgDefaultSorterDur)
 
   if avgFastSorterDur >= avgDefaultSorterDur {
     t.Errorf("Default implementation(%v) should be slower than generic implementation(%v).", avgDefaultSorterDur, avgFastSorterDur)
+  }
+
+  if avgFastSorterDur >= avgFastLessSorterDur {
+    t.Errorf("Ordered implementation(%v) should be faster than less implementation(%v).", avgFastSorterDur, avgFastLessSorterDur)
   }
 }
 
