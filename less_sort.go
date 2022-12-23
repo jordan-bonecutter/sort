@@ -1,41 +1,17 @@
 package sort
 
 import (
-  "golang.org/x/exp/constraints"
   "math/bits"
 )
 
-type sortedHint int
-
-const (
-	unknownHint sortedHint = iota
-	increasingHint
-	decreasingHint
-)
-
-// xorshift paper: https://www.jstatsoft.org/article/view/v008i14/xorshift.pdf
-type xorshift uint64
-
-func (r *xorshift) Next() uint64 {
-	*r ^= *r << 13
-	*r ^= *r >> 17
-	*r ^= *r << 5
-	return uint64(*r)
-}
-
-func nextPowerOfTwo(length int) uint {
-	shift := uint(bits.Len(uint(length)))
-	return uint(1 << shift)
-}
-
-func Ordered[T constraints.Ordered](data []T) {
-  pdqsort_func(data, 0, len(data), bits.Len(uint(len(data))))
+func LessSort[T any](data []T, less func(a, b *T) bool) {
+  pdqsort_func_less(data, 0, len(data), bits.Len(uint(len(data))), less)
 }
 
 // insertionSort_func sorts data[a:b] using insertion sort.
-func insertionSort_func[T constraints.Ordered](data []T, a, b int) {
+func insertionSort_func_less[T any](data []T, a, b int, less func(a, b *T) bool) {
 	for i := a + 1; i < b; i++ {
-		for j := i; j > a && data[j] < data[j-1]; j-- {
+		for j := i; j > a && less(&data[j], &data[j-1]); j-- {
       data[j], data[j-1] = data[j-1], data[j]
 		}
 	}
@@ -43,17 +19,17 @@ func insertionSort_func[T constraints.Ordered](data []T, a, b int) {
 
 // siftDown_func implements the heap property on data[lo:hi].
 // first is an offset into the array where the root of the heap lies.
-func siftDown_func[T constraints.Ordered](data []T, lo, hi, first int) {
+func siftDown_func_less[T any](data []T, lo, hi, first int, less func(a, b *T) bool) {
 	root := lo
 	for {
 		child := 2*root + 1
 		if child >= hi {
 			break
 		}
-		if child+1 < hi && data[first+child] < data[first+child+1] {
+		if child+1 < hi && less(&data[first+child], &data[first+child+1]) {
 			child++
 		}
-		if !(data[first+root] < data[first+child]) {
+		if !less(&data[first+root], &data[first+child]) {
 			return
 		}
     data[first+root], data[first+child] = data[first+child], data[first+root]
@@ -61,20 +37,20 @@ func siftDown_func[T constraints.Ordered](data []T, lo, hi, first int) {
 	}
 }
 
-func heapSort_func[T constraints.Ordered](data []T, a, b int) {
+func heapSort_func_less[T any](data []T, a, b int, less func(a, b *T) bool) {
 	first := a
 	lo := 0
 	hi := b - a
 
 	// Build heap with greatest element at top.
 	for i := (hi - 1) / 2; i >= 0; i-- {
-		siftDown_func(data, i, hi, first)
+		siftDown_func_less(data, i, hi, first, less)
 	}
 
 	// Pop elements, largest first, into end of data.
 	for i := hi - 1; i >= 0; i-- {
     data[first], data[first+i] = data[first+i], data[first]
-		siftDown_func(data, lo, i, first)
+		siftDown_func_less(data, lo, i, first, less)
 	}
 }
 
@@ -84,7 +60,7 @@ func heapSort_func[T constraints.Ordered](data []T, a, b int) {
 // C++ implementation: https://github.com/orlp/pdqsort
 // Rust implementation: https://docs.rs/pdqsort/latest/pdqsort/
 // limit is the number of allowed bad (very unbalanced) pivots before falling back to heapsort.
-func pdqsort_func[T constraints.Ordered](data []T, a, b, limit int) {
+func pdqsort_func_less[T any](data []T, a, b, limit int, less func(a, b *T) bool) {
 	const maxInsertion = 12
 
 	var (
@@ -96,13 +72,13 @@ func pdqsort_func[T constraints.Ordered](data []T, a, b, limit int) {
 		length := b - a
 
 		if length <= maxInsertion {
-			insertionSort_func(data, a, b)
+			insertionSort_func_less(data, a, b, less)
 			return
 		}
 
 		// Fall back to heapsort if too many bad choices were made.
 		if limit == 0 {
-			heapSort_func(data, a, b)
+			heapSort_func_less(data, a, b, less)
 			return
 		}
 
@@ -112,7 +88,7 @@ func pdqsort_func[T constraints.Ordered](data []T, a, b, limit int) {
 			limit--
 		}
 
-		pivot, hint := choosePivot_func(data, a, b)
+		pivot, hint := choosePivot_func_less(data, a, b, less)
 		if hint == decreasingHint {
 			reverseRange_func(data, a, b)
 			// The chosen pivot was pivot-a elements after the start of the array.
@@ -124,31 +100,31 @@ func pdqsort_func[T constraints.Ordered](data []T, a, b, limit int) {
 
 		// The slice is likely already sorted.
 		if wasBalanced && wasPartitioned && hint == increasingHint {
-			if partialInsertionSort_func(data, a, b) {
+			if partialInsertionSort_func_less(data, a, b, less) {
 				return
 			}
 		}
 
 		// Probably the slice contains many duplicate elements, partition the slice into
 		// elements equal to and elements greater than the pivot.
-		if a > 0 && !(data[a-1] < data[pivot]) {
-			mid := partitionEqual_func(data, a, b, pivot)
+		if a > 0 && !less(&data[a-1], &data[pivot]) {
+			mid := partitionEqual_func_less(data, a, b, pivot, less)
 			a = mid
 			continue
 		}
 
-		mid, alreadyPartitioned := partition_func(data, a, b, pivot)
+		mid, alreadyPartitioned := partition_func_less(data, a, b, pivot, less)
 		wasPartitioned = alreadyPartitioned
 
 		leftLen, rightLen := mid-a, b-mid
 		balanceThreshold := length / 8
 		if leftLen < rightLen {
 			wasBalanced = leftLen >= balanceThreshold
-			pdqsort_func(data, a, mid, limit)
+			pdqsort_func_less(data, a, mid, limit, less)
 			a = mid + 1
 		} else {
 			wasBalanced = rightLen >= balanceThreshold
-			pdqsort_func(data, mid+1, b, limit)
+			pdqsort_func_less(data, mid+1, b, limit, less)
 			b = mid
 		}
 	}
@@ -158,14 +134,14 @@ func pdqsort_func[T constraints.Ordered](data []T, a, b, limit int) {
 // Let p = data[pivot]
 // Moves elements in data[a:b] around, so that data[i]<p and data[j]>=p for i<newpivot and j>newpivot.
 // On return, data[newpivot] = p
-func partition_func[T constraints.Ordered](data []T, a, b, pivot int) (newpivot int, alreadyPartitioned bool) {
+func partition_func_less[T any](data []T, a, b, pivot int, less func(a, b *T) bool) (newpivot int, alreadyPartitioned bool) {
   data[a], data[pivot] = data[pivot], data[a]
 	i, j := a+1, b-1 // i and j are inclusive of the elements remaining to be partitioned
 
-	for i <= j && data[i] < data[a] {
+	for i <= j && less(&data[i], &data[a]) {
 		i++
 	}
-	for i <= j && !(data[j] < data[a]) {
+	for i <= j && !less(&data[j], &data[a]) {
 		j--
 	}
 	if i > j {
@@ -177,10 +153,10 @@ func partition_func[T constraints.Ordered](data []T, a, b, pivot int) (newpivot 
 	j--
 
 	for {
-		for i <= j && data[i] < data[a] {
+		for i <= j && less(&data[i], &data[a]) {
 			i++
 		}
-		for i <= j && !(data[j] < data[a]) {
+		for i <= j && !less(&data[j], &data[a]) {
 			j--
 		}
 		if i > j {
@@ -196,15 +172,15 @@ func partition_func[T constraints.Ordered](data []T, a, b, pivot int) (newpivot 
 
 // partitionEqual_func partitions data[a:b] into elements equal to data[pivot] followed by elements greater than data[pivot].
 // It assumed that data[a:b] does not contain elements smaller than the data[pivot].
-func partitionEqual_func[T constraints.Ordered](data []T, a, b, pivot int) (newpivot int) {
+func partitionEqual_func_less[T any](data []T, a, b, pivot int, less func(a, b *T) bool) (newpivot int) {
   data[a], data[pivot] = data[pivot], data[a]
 	i, j := a+1, b-1 // i and j are inclusive of the elements remaining to be partitioned
 
 	for {
-		for i <= j && !(data[a] < data[i]) {
+		for i <= j && !less(&data[a], &data[i]) {
 			i++
 		}
-		for i <= j && data[a] < data[j] {
+		for i <= j && less(&data[a], &data[j]) {
 			j--
 		}
 		if i > j {
@@ -218,14 +194,14 @@ func partitionEqual_func[T constraints.Ordered](data []T, a, b, pivot int) (newp
 }
 
 // partialInsertionSort_func partially sorts a slice, returns true if the slice is sorted at the end.
-func partialInsertionSort_func[T constraints.Ordered](data []T, a, b int) bool {
+func partialInsertionSort_func_less[T any](data []T, a, b int, less func(a, b *T) bool) bool {
 	const (
 		maxSteps         = 5  // maximum number of adjacent out-of-order pairs that will get shifted
 		shortestShifting = 50 // don't shift any elements on short arrays
 	)
 	i := a + 1
 	for j := 0; j < maxSteps; j++ {
-		for i < b && !(data[i] < data[i-1]) {
+		for i < b && !less(&data[i], &data[i-1]) {
 			i++
 		}
 
@@ -242,7 +218,7 @@ func partialInsertionSort_func[T constraints.Ordered](data []T, a, b int) bool {
 		// Shift the smaller one to the left.
 		if i-a >= 2 {
 			for j := i - 1; j >= 1; j-- {
-				if !(data[j] < data[j-1]) {
+				if !less(&data[j], &data[j-1]) {
 					break
 				}
         data[j], data[j-1] = data[j-1], data[j]
@@ -251,7 +227,7 @@ func partialInsertionSort_func[T constraints.Ordered](data []T, a, b int) bool {
 		// Shift the greater one to the right.
 		if b-i >= 2 {
 			for j := i + 1; j < b; j++ {
-				if !(data[j] < data[j-1]) {
+				if !less(&data[j], &data[j-1]) {
 					break
 				}
         data[j], data[j-1] = data[j-1], data[j]
@@ -261,30 +237,12 @@ func partialInsertionSort_func[T constraints.Ordered](data []T, a, b int) bool {
 	return false
 }
 
-// breakPatterns_func scatters some elements around in an attempt to break some patterns
-// that might cause imbalanced partitions in quicksort.
-func breakPatterns_func[T any](data []T, a, b int) {
-	length := b - a
-	if length >= 8 {
-		random := xorshift(length)
-		modulus := nextPowerOfTwo(length)
-
-		for idx := a + (length/4)*2 - 1; idx <= a+(length/4)*2+1; idx++ {
-			other := int(uint(random.Next()) & (modulus - 1))
-			if other >= length {
-				other -= length
-			}
-      data[idx], data[a+other] = data[a+other], data[idx]
-		}
-	}
-}
-
 // choosePivot_func chooses a pivot in data[a:b].
 //
 // [0,8): chooses a static pivot.
 // [8,shortestNinther): uses the simple median-of-three method.
 // [shortestNinther,∞): uses the Tukey ninther method.
-func choosePivot_func[T constraints.Ordered](data []T, a, b int) (pivot int, hint sortedHint) {
+func choosePivot_func_less[T any](data []T, a, b int, less func(a, b *T) bool) (pivot int, hint sortedHint) {
 	const (
 		shortestNinther = 50
 		maxSwaps        = 4 * 3
@@ -302,12 +260,12 @@ func choosePivot_func[T constraints.Ordered](data []T, a, b int) (pivot int, hin
 	if l >= 8 {
 		if l >= shortestNinther {
 			// Tukey ninther method, the idea came from Rust's implementation.
-			i = medianAdjacent_func(data, i, &swaps)
-			j = medianAdjacent_func(data, j, &swaps)
-			k = medianAdjacent_func(data, k, &swaps)
+			i = medianAdjacent_func_less(data, i, &swaps, less)
+			j = medianAdjacent_func_less(data, j, &swaps, less)
+			k = medianAdjacent_func_less(data, k, &swaps, less)
 		}
 		// Find the median among i, j, k and stores it into j.
-		j = median_func(data, i, j, k, &swaps)
+		j = median_func_less(data, i, j, k, &swaps, less)
 	}
 
 	switch swaps {
@@ -321,8 +279,8 @@ func choosePivot_func[T constraints.Ordered](data []T, a, b int) (pivot int, hin
 }
 
 // order2_func returns x,y where data[x] <= data[y], where x,y=a,b or x,y=b,a.
-func order2_func[T constraints.Ordered](data []T, a, b int, swaps *int) (int, int) {
-	if data[b] < data[a] {
+func order2_func_less[T any](data []T, a, b int, swaps *int, less func(a, b *T) bool) (int, int) {
+	if less(&data[b], &data[a]) {
 		*swaps++
 		return b, a
 	}
@@ -330,25 +288,15 @@ func order2_func[T constraints.Ordered](data []T, a, b int, swaps *int) (int, in
 }
 
 // median_func returns x where data[x] is the median of data[a],data[b],data[c], where x is a, b, or c.
-func median_func[T constraints.Ordered](data []T, a, b, c int, swaps *int) int {
-	a, b = order2_func(data, a, b, swaps)
-	b, c = order2_func(data, b, c, swaps)
-	a, b = order2_func(data, a, b, swaps)
+func median_func_less[T any](data []T, a, b, c int, swaps *int, less func(a, b *T) bool) int {
+	a, b = order2_func_less(data, a, b, swaps, less)
+	b, c = order2_func_less(data, b, c, swaps, less)
+	a, b = order2_func_less(data, a, b, swaps, less)
 	return b
 }
 
 // medianAdjacent_func finds the median of data[a - 1], data[a], data[a + 1] and stores the index into a.
-func medianAdjacent_func[T constraints.Ordered](data []T, a int, swaps *int) int {
-	return median_func(data, a-1, a, a+1, swaps)
-}
-
-func reverseRange_func[T any](data []T, a, b int) {
-	i := a
-	j := b - 1
-	for i < j {
-    data[i], data[j] = data[j], data[i]
-		i++
-		j--
-	}
+func medianAdjacent_func_less[T any](data []T, a int, swaps *int, less func(a, b *T) bool) int {
+	return median_func_less(data, a-1, a, a+1, swaps, less)
 }
 

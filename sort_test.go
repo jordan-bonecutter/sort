@@ -10,7 +10,7 @@ import (
 )
 
 const InputSize = 10000
-const BenchIters = 100
+const BenchIters = 1000
 
 func NewRandArray[T any](length int, rvg func() T) []T {
   ret := make([]T, length)
@@ -51,5 +51,44 @@ func getAvgSpeed[T any](sorter func([]T), rvg func() T) time.Duration {
   }
 
   return total / BenchIters
+}
+
+type Person struct {
+  Name string
+  Age int
+}
+
+func PersonLess(a, b *Person) bool {
+  return a.Age < b.Age
+}
+
+func RandomPerson() Person {
+  return Person{ Age: rand.Int() }
+}
+
+func TestSortLessCapability(t *testing.T) {
+  data := NewRandArray(InputSize, RandomPerson)
+  fastsort.LessSort(data, PersonLess)
+  if !sort.SliceIsSorted(data, func(i, j int) bool {
+    return PersonLess(&data[i], &data[j])
+  }) {
+    t.Errorf("Failed sorting array!")
+  }
+}
+
+func TestLessSortSpeed(t *testing.T) {
+  avgFastSorterDur := getAvgSpeed[Person](func(data []Person) {
+    fastsort.LessSort(data, PersonLess)
+  }, RandomPerson)
+
+  avgDefaultSorterDur := getAvgSpeed[Person](func(data []Person) {
+    sort.Slice(data, func(i, j int) bool {
+      return PersonLess(&data[i], &data[j])
+    })
+  }, RandomPerson)
+
+  if avgFastSorterDur >= avgDefaultSorterDur {
+    t.Errorf("Default implementation(%v) should be slower than generic implementation(%v).", avgDefaultSorterDur, avgFastSorterDur)
+  }
 }
 
