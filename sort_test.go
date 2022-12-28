@@ -90,7 +90,13 @@ func TestLessSortSpeed(t *testing.T) {
   avgFastSorterDur := getAvgSpeed[Person](func(data []Person) {
     fastsort.LessSort(data, PersonLess)
   }, RandomPerson)
-  t.Logf("Fast implementation took %v", avgFastSorterDur)
+  t.Logf("Less sort implementation took %v", avgFastSorterDur)
+
+  avgFieldSorterDur := getAvgSpeed[Person](func(data []Person) {
+    proto := Person{}
+    fastsort.StructField[Person, int](&proto, &proto.Age, data)
+  }, RandomPerson)
+  t.Logf("Struct field implementation took %v", avgFieldSorterDur)
 
   avgDefaultSorterDur := getAvgSpeed[Person](func(data []Person) {
     sort.Slice(data, func(i, j int) bool {
@@ -101,6 +107,10 @@ func TestLessSortSpeed(t *testing.T) {
 
   if avgFastSorterDur >= avgDefaultSorterDur {
     t.Errorf("Default implementation(%v) should be slower than generic implementation(%v).", avgDefaultSorterDur, avgFastSorterDur)
+  }
+
+  if avgFieldSorterDur >= avgFastSorterDur {
+    t.Errorf("Less function implementation(%v) should be slower than struct field implementation(%v).", avgFastSorterDur, avgFieldSorterDur)
   }
 }
 
