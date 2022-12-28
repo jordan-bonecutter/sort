@@ -68,7 +68,7 @@ type Person struct {
   Age int
 }
 
-func PersonLess(a, b *Person) bool {
+func Younger(a, b *Person) bool {
   return a.Age < b.Age
 }
 
@@ -78,9 +78,9 @@ func RandomPerson() Person {
 
 func TestSortLessCapability(t *testing.T) {
   data := NewRandArray(InputSize, RandomPerson)
-  fastsort.LessSort(data, PersonLess)
+  fastsort.LessSort(data, Younger)
   if !sort.SliceIsSorted(data, func(i, j int) bool {
-    return PersonLess(&data[i], &data[j])
+    return Younger(&data[i], &data[j])
   }) {
     t.Errorf("Failed sorting array!")
   }
@@ -88,7 +88,7 @@ func TestSortLessCapability(t *testing.T) {
 
 func TestLessSortSpeed(t *testing.T) {
   avgFastSorterDur := getAvgSpeed[Person](func(data []Person) {
-    fastsort.LessSort(data, PersonLess)
+    fastsort.LessSort(data, Younger)
   }, RandomPerson)
   t.Logf("Less sort implementation took %v", avgFastSorterDur)
 
@@ -100,7 +100,7 @@ func TestLessSortSpeed(t *testing.T) {
 
   avgDefaultSorterDur := getAvgSpeed[Person](func(data []Person) {
     sort.Slice(data, func(i, j int) bool {
-      return PersonLess(&data[i], &data[j])
+      return Younger(&data[i], &data[j])
     })
   }, RandomPerson)
   t.Logf("Default implementation took %v", avgDefaultSorterDur)
@@ -111,6 +111,17 @@ func TestLessSortSpeed(t *testing.T) {
 
   if avgFieldSorterDur >= avgFastSorterDur {
     t.Errorf("Less function implementation(%v) should be slower than struct field implementation(%v).", avgFastSorterDur, avgFieldSorterDur)
+  }
+}
+
+func TestFieldSortCorrectness(t *testing.T) {
+  data := NewRandArray(InputSize, RandomPerson)
+  proto := Person{}
+  fastsort.StructField[Person, int](&proto, &proto.Age, data)
+  if !sort.SliceIsSorted(data, func(i, j int) bool {
+    return Younger(&data[i], &data[j])
+  }) {
+    t.Errorf("Failed sorting array!")
   }
 }
 
